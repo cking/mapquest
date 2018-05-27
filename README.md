@@ -1,4 +1,4 @@
-# MapQuest Google Go Client
+# MapQuest Google Go Client  [![GoDoc](https://godoc.org/github.com/cking/mapquest?status.svg)](https://godoc.org/github.com/cking/mapquest) [![Go Report Card](https://goreportcard.com/badge/github.com/cking/mapquest)](https://goreportcard.com/report/github.com/cking/mapquest) [![Sourcegraph](https://sourcegraph.com/github.com/cking/mapquest/-/badge.svg)](https://sourcegraph.com/github.com/cking/mapquest?badge)
 
 This is a very first draft of a Google Go client for
 [MapQuest Open Data Map APIs and Web Services](http://developer.mapquest.com/web/products/open).
@@ -118,9 +118,9 @@ Further details can be found in the
 # Contributors
 
 * [Oliver Eilhard](https://github.com/olivere/) (original author)
+* [Christopher König](https://github.com/cking) (new author)
 
 # License
 
 This code comes with a [MIT
 license](https://github.com/olivere/mapquest/blob/master/LICENSE).
-
