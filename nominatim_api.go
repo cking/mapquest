@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"strings"
+
+	"github.com/google/go-querystring/query"
 )
 
 var _ = log.Print
@@ -48,82 +49,51 @@ func (api *NominatimAPI) buildSearchURL(req *NominatimSearchRequest) (string, er
 	}
 
 	// Add key and other parameters to the query string
-	q := u.Query()
-	q.Set("format", "json")
 	if req.Query != "" {
-		q.Set("q", req.Query)
-	} else {
-		if req.Street != "" {
-			q.Set("street", req.Street)
-		}
-		if req.City != "" {
-			q.Set("city", req.City)
-		}
-		if req.County != "" {
-			q.Set("county", req.County)
-		}
-		if req.State != "" {
-			q.Set("state", req.State)
-		}
-		if req.Country != "" {
-			q.Set("country", req.Country)
-		}
-		if req.PostalCode != "" {
-			q.Set("postalcode", req.PostalCode)
-		}
+		req.Street = ""
+		req.City = ""
+		req.County = ""
+		req.State = ""
+		req.Country = ""
+		req.PostalCode = ""
 	}
-	q.Set("addressdetails", "1")
-	if req.Limit > 0 {
-		q.Set("limit", fmt.Sprintf("%d", req.Limit))
-	}
-	if len(req.CountryCodes) > 0 {
-		q.Set("countrycodes", strings.Join(req.CountryCodes, ","))
-	}
-	if len(req.ViewBox) == 4 {
-		q.Set("viewbox", fmt.Sprintf("%f,%f,%f,%f", req.ViewBox[0], req.ViewBox[1], req.ViewBox[2], req.ViewBox[3]))
-	}
-	if len(req.ExcludePlaceIds) > 0 {
-		q.Set("exclude_place_ids", strings.Join(req.ExcludePlaceIds, ","))
-	}
-	if req.Bounded != nil {
-		if *req.Bounded {
-			q.Set("bounded", "1")
-		} else {
-			q.Set("bounded", "0")
-		}
-	}
-	// TODO(oe): routewidth
-	if req.RouteWidth != nil {
-		q.Set("routewidth", fmt.Sprintf("%f", *req.RouteWidth))
-	}
-	if req.OSMType != "" {
-		q.Set("osm_type", req.OSMType)
-	}
-	if req.OSMId != "" {
-		q.Set("osm_id", req.OSMId)
-	}
+	v, _ := query.Values(req)
 
-	// No key here!
-	u.RawQuery = q.Encode()
+	v.Set("format", "json")
+	v.Set("addressdetails", "1")
+	v.Set("key", api.c.key)
+	u.RawQuery = v.Encode()
 	return u.String(), nil
 }
 
+type NominatimViewBox struct {
+	Left   float64
+	Top    float64
+	Right  float64
+	Bottom float64
+}
+
+func (vb *NominatimViewBox) EncodeValues(key string, v *url.Values) error {
+	v.Set(key, fmt.Sprintf("%f,%f,%f,%f", vb.Left, vb.Top, vb.Right, vb.Bottom))
+	return nil
+}
+
 type NominatimSearchRequest struct {
-	Query           string
-	Street          string
-	City            string
-	County          string
-	State           string
-	Country         string
-	PostalCode      string
-	Limit           int
-	CountryCodes    []string
-	ViewBox         []float64
-	ExcludePlaceIds []string
-	Bounded         *bool
-	RouteWidth      *float64
-	OSMType         string
-	OSMId           string
+	Query           string            `url:"q,omitempty"`
+	Street          string            `url:"street,omitempty"`
+	City            string            `url:"city,omitempty"`
+	County          string            `url:"county,omitempty"`
+	State           string            `url:"state,omitempty"`
+	Country         string            `url:"country,omitempty"`
+	PostalCode      string            `url:"postalcode,omitempty"`
+	Limit           int               `url:"limit,omitempty"`
+	CountryCodes    []string          `url:"coutrycodes,comma,omitempty"`
+	ViewBox         *NominatimViewBox `url:"viewbox,omitempty"`
+	ExcludePlaceIds []string          `url:"exclude_place_ids,comma,omitempty"`
+	Bounded         *bool             `url:"bounded,omitempty"`
+	RouteWidth      *float64          `url:"routewidth,omitempty"`
+	OSMType         string            `url:"osm_type,omitempty"`
+	OSMId           string            `url:"osm_id,omitempty"`
 }
 
 type NominatimSearchResponse struct {
