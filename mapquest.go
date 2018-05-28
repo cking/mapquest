@@ -1,7 +1,6 @@
 package mapquest
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,7 +26,6 @@ func apiURL(path ...string) *url.URL {
 type Client struct {
 	httpClient *http.Client
 	key        string
-	log        *log.Logger
 }
 
 // NewClient creates a new client for accessing the MapQuest API. You need
@@ -53,12 +51,6 @@ func (c *Client) SetHTTPClient(client *http.Client) {
 // be returned here.
 func (c *Client) HTTPClient() *http.Client {
 	return c.httpClient
-}
-
-// SetLogger sets the logger to use when e.g. debugging requests.
-// Set to nil to disable logging (the default).
-func (c *Client) SetLogger(logger *log.Logger) {
-	c.log = logger
 }
 
 // StaticMap gives access to the MapQuest static map API

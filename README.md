@@ -37,19 +37,9 @@ After you created the file, you can run tests as usual:
 ## Creating a client
 
 To use the various APIs, you first need to create a client.
-Here's an example:
 
     client := mapquest.NewClient("<your-app-key>")
 
-    // To use HTTPS, use:
-    client.SetHTTPS(true)
-
-    // To use your own http.Client:
-    client.SetHTTPClient(myClient)
-
-    // To log request and response, set a logger:
-    logger := log.New(os.Stderr, "", 0)
-    client.SetLogger(logger)
 
 Now that you have a Client, you can use the APIs.
 
@@ -58,16 +48,13 @@ Now that you have a Client, you can use the APIs.
 Here's an example of how to use the MapQuest static map API:
 
     req := &mapquest.StaticMapRequest{
-      Center: &mapquest.GeoPoint{
-        Longitude: 11.54165,
-        Latitude:  48.151313,
-      },
+      Center: "11.54165,48.151313",
       Zoom:   9,
       Width:  500,
       Height: 300,
       Format: "png",
     }
-    img, err := client.StaticMap().Get(req)
+    img, err := client.StaticMap().Map(req)
     if err != nil {
       panic(err)
     }
@@ -81,15 +68,7 @@ Further details can be found in the
 The [Geocoding API](http://open.mapquestapi.com/geocoding/) enables you
 to take an address and get the associated latitude and longitude.
 
-    req := &mapquest.GeocodingAddressRequest{
-      Location: &mapquest.GeocodingLocation{
-        Street:     "1090 N Charlotte St",
-        City:       "Lancaster",
-        State:      "PA",
-        PostalCode: "17603",
-      },
-    }
-    res, err := client.Geocoding().Address(req)
+    res, err := client.Geocoding().SimpleAddress("1090 N Charlotte St, Lancaster", 0)
     if err != nil {
       panic(err)
     }
@@ -103,11 +82,7 @@ The [Nominatim API](http://open.mapquestapi.com/nominatim/) is a search
 interface that relies solely on the data contributed to
 [OpenStreetMap](http://www.openstreetmap.org/). It does not require an App-Key.
 
-    req := &mapquest.NominatimSearchRequest{
-      Query: "Unter den Linden 117, Berlin, DE",
-      Limit: 1,
-    }
-    res, err := client.Nominatim().Search(req)
+    res, err := client.Nominatim().SimpleSearch("Unter den Linden 117, Berlin, DE", 1)
     if err != nil {
       panic(err)
     }
