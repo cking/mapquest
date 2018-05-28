@@ -90,30 +90,6 @@ func (s *StaticMapSize) EncodeValues(key string, v *url.Values) error {
 	return nil
 }
 
-type StaticMapGeoPoint struct {
-	Latitude  float64
-	Longitude float64
-}
-
-func (s *StaticMapGeoPoint) String() string {
-	return fmt.Sprintf("%f,%f", s.Latitude, s.Longitude)
-}
-
-func (s *StaticMapGeoPoint) EncodeValues(key string, v *url.Values) error {
-	v.Set(key, s.String())
-	return nil
-}
-
-type StaticMapBoundingBox struct {
-	TopLeft     StaticMapGeoPoint
-	BottomRight StaticMapGeoPoint
-}
-
-func (s *StaticMapBoundingBox) EncodeValues(key string, v *url.Values) error {
-	v.Set(key, fmt.Sprintf("%v,%v", s.TopLeft.String(), s.BottomRight.String()))
-	return nil
-}
-
 type StaticMapFormat string
 
 const (
@@ -283,14 +259,14 @@ type StaticMapShape struct {
 }
 
 type StaticMapRequest struct {
-	Size        *StaticMapSize        `url:"size,omitempty"`
-	Center      string                `url:"center,omitempty"`
-	BoundingBox *StaticMapBoundingBox `url:"boundingBox,omitempty"`
-	Margin      int                   `url:"margin,omitempty"`
-	Zoom        int                   `url:"zoom,omitempty"`
-	Format      StaticMapFormat       `url:"format,omitempty"`
-	Type        StaticMapType         `url:"type,omitempty"`
-	Scalebar    *StaticMapScalebar    `url:"scalebar,omitempty"`
+	Size        *StaticMapSize     `url:"size,omitempty"`
+	Center      string             `url:"center,omitempty"`
+	BoundingBox *BoundingBox       `url:"boundingBox,omitempty"`
+	Margin      int                `url:"margin,omitempty"`
+	Zoom        int                `url:"zoom,omitempty"`
+	Format      StaticMapFormat    `url:"format,omitempty"`
+	Type        StaticMapType      `url:"type,omitempty"`
+	Scalebar    *StaticMapScalebar `url:"scalebar,omitempty"`
 
 	// additional location options
 	Locations     StaticMapLocations `url:"locations,omitempty"`

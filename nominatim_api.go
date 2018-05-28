@@ -2,9 +2,7 @@ package mapquest
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/google/go-querystring/query"
 )
@@ -91,18 +89,6 @@ func (api *NominatimAPI) Reverse(req *NominatimReverseRequest) (*NominatimSearch
 	return res, nil
 }
 
-type NominatimViewBox struct {
-	Left   float64
-	Top    float64
-	Right  float64
-	Bottom float64
-}
-
-func (s *NominatimViewBox) EncodeValues(key string, v *url.Values) error {
-	v.Set(key, fmt.Sprintf("%f,%f,%f,%f", s.Left, s.Top, s.Right, s.Bottom))
-	return nil
-}
-
 type NominatimOSMType string
 
 const (
@@ -112,15 +98,15 @@ const (
 )
 
 type NominatimSearchRequest struct {
-	Query           string            `url:"q"`
-	AddressDetails  bool              `url:"addressdetails,omitempty"`
-	Limit           int               `url:"limit,omitempty"`
-	CountryCodes    []string          `url:"countrycodes,comma,omitempty"`
-	ViewBox         *NominatimViewBox `url:"viewbox,omitempty"` // let,top,right,bottom => todo
-	ExcludePlaceIDs []string          `url:"exclude_place_ids,comma,omitempty"`
-	RouteWidth      float64           `url:"routewidth,omitempty"`
-	OSMType         NominatimOSMType  `url:"osm_type,omitempty"`
-	OSMID           string            `url:"osm_id,omitempty"`
+	Query           string           `url:"q"`
+	AddressDetails  bool             `url:"addressdetails,omitempty"`
+	Limit           int              `url:"limit,omitempty"`
+	CountryCodes    []string         `url:"countrycodes,comma,omitempty"`
+	ViewBox         *BoundingBox     `url:"viewbox,omitempty"` // let,top,right,bottom => todo
+	ExcludePlaceIDs []string         `url:"exclude_place_ids,comma,omitempty"`
+	RouteWidth      float64          `url:"routewidth,omitempty"`
+	OSMType         NominatimOSMType `url:"osm_type,omitempty"`
+	OSMID           string           `url:"osm_id,omitempty"`
 }
 
 type NominatimSearchResponse struct {
