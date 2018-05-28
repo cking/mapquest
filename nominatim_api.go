@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	NominaatimPrefix  = "nominatim"
-	NominaatimVersion = "v1"
+	NominatimPrefix  = "nominatim"
+	NominatimVersion = "v1"
 )
 
 // NominatimAPI enables users to request nominatim searches via the
@@ -35,7 +35,7 @@ func (api *NominatimAPI) Search(req *NominatimSearchRequest) (*NominatimSearchRe
 
 	q.Set("key", api.c.key)
 	q.Set("format", "json")
-	u := apiURL(StaticMapPrefix, StaticMapVersion, "search.api")
+	u := apiURL(NominatimPrefix, NominatimVersion, "search.api")
 	u.RawQuery = q.Encode()
 
 	httpRequest, err := http.NewRequest("GET", u.String(), nil)
@@ -69,7 +69,7 @@ func (api *NominatimAPI) Reverse(req *NominatimReverseRequest) (*NominatimSearch
 
 	q.Set("key", api.c.key)
 	q.Set("format", "json")
-	u := apiURL(StaticMapPrefix, StaticMapVersion, "search.api")
+	u := apiURL(NominatimPrefix, NominatimVersion, "search.api")
 	u.RawQuery = q.Encode()
 
 	httpRequest, err := http.NewRequest("GET", u.String(), nil)
