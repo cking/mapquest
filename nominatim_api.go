@@ -48,7 +48,7 @@ func (api *NominatimAPI) Search(req *NominatimSearchRequest) (*NominatimSearchRe
 	defer httpResponse.Body.Close()
 
 	var res *NominatimSearchResponse
-	if err := json.NewDecoder(httpResponse.Body).Decode(&res); err != nil {
+	if err := json.NewDecoder(httpResponse.Body).Decode(res); err != nil {
 		return nil, err
 	}
 
@@ -82,7 +82,7 @@ func (api *NominatimAPI) Reverse(req *NominatimReverseRequest) (*NominatimSearch
 	defer httpResponse.Body.Close()
 
 	var res *NominatimSearchResponseEntry
-	if err := json.NewDecoder(httpResponse.Body).Decode(&res); err != nil {
+	if err := json.NewDecoder(httpResponse.Body).Decode(res); err != nil {
 		return nil, err
 	}
 
