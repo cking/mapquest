@@ -3,19 +3,23 @@ package mapquest
 import (
 	"fmt"
 	"image"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+
+	// static map returns a raw gif, jpeg or png object
+	// to bring support out of the box, we require them here
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
-	"log"
-	"net/url"
-	"strings"
+
+	"github.com/google/go-querystring/query"
 )
 
-var _ = log.Print
-
 const (
-	// StaticMapPathPrefix is the default path prefix for the Static Map API.
-	StaticMapPathPrefix = "/staticmap/v4"
+	StaticMapPrefix  = "staticmap"
+	StaticMapVersion = "v5"
 )
 
 // StaticMapAPI enables users to request static map images via the
@@ -24,153 +28,286 @@ type StaticMapAPI struct {
 	c *Client
 }
 
-// Get returns an image of static map by querying MapQuest.
-func (api *StaticMapAPI) Get(req *StaticMapRequest) (image.Image, error) {
-	u, err := api.buildURL(req)
+func (api *StaticMapAPI) Map(req *StaticMapRequest) (image.Image, error) {
+	reader, err := api.MapReader(req)
 	if err != nil {
 		return nil, err
 	}
+	defer reader.Close()
 
-	res, err := api.c.getResponse(u)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	img, _, err := image.Decode(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return img, nil
+	img, _, err := image.Decode(reader)
+	return img, err
 }
 
-// buildURL returns the complete URL for the request,
-// including the key to query the MapQuest API.
-func (api *StaticMapAPI) buildURL(req *StaticMapRequest) (string, error) {
-	urls := fmt.Sprintf("%s%s/getmap", api.c.BaseURL(), StaticMapPathPrefix)
-	u, err := url.Parse(urls)
+func (api *StaticMapAPI) MapReader(req *StaticMapRequest) (io.ReadCloser, error) {
+	q, err := query.Values(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// Add key and other parameters to the query string
-	qs := make([]string, 0)
+	q.Set("key", api.c.key)
+	u := apiURL(StaticMapPrefix, StaticMapVersion, "map")
+	u.RawQuery = q.Encode()
 
-	if req.Center != nil {
-		pt := *req.Center
-		qs = append(qs, fmt.Sprintf("center=%f,%f", pt.Latitude, pt.Longitude))
+	httpRequest, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
 	}
-	if req.Bestfit != nil {
-		box := *req.Bestfit
-		qs = append(qs, fmt.Sprintf("bestfit=%f,%f,%f,%f",
-			box.A.Latitude, box.A.Longitude,
-			box.B.Latitude, box.B.Longitude))
+	httpRequest.Header.Set("User-Agent", UserAgent)
+	httpResponse, err := api.c.httpClient.Do(httpRequest)
+	if err != nil {
+		return nil, err
 	}
-	if req.Margin > 0 {
-		qs = append(qs, fmt.Sprintf("margin=%d", req.Margin))
+
+	return httpResponse.Body, nil
+}
+
+type StaticMapSize struct {
+	Width  int
+	Height int
+	Retina bool
+}
+
+func (s *StaticMapSize) EncodeValues(key string, v *url.Values) error {
+	if s.Width > 1920 {
+		return ErrDimensionToLarge
 	}
-	qs = append(qs, fmt.Sprintf("size=%d,%d", req.Width, req.Height))
-	if req.Zoom > 0 {
-		qs = append(qs, fmt.Sprintf("zoom=%d", req.Zoom))
+	if s.Height > 1920 {
+		return ErrDimensionToLarge
 	}
-	if req.Scale > 0 {
-		qs = append(qs, fmt.Sprintf("scale=%d", req.Scale))
+
+	size := ""
+
+	if s.Width > 0 && s.Height > 0 {
+		size = fmt.Sprintf("%d,%d", s.Width, s.Height)
 	}
-	if req.Type != "" {
-		qs = append(qs, fmt.Sprintf("type=%s", url.QueryEscape(req.Type)))
+
+	if s.Retina {
+		size += "@2"
 	}
-	if req.Format != "" {
-		qs = append(qs, fmt.Sprintf("imagetype=%s", url.QueryEscape(req.Format)))
-	}
-	if len(req.PointsOfInterest) > 0 {
-		parts := make([]string, len(req.PointsOfInterest))
-		for i, poi := range req.PointsOfInterest {
-			if poi.OffsetX > 0 || poi.OffsetY > 0 {
-				parts[i] = fmt.Sprintf("%s,%f,%f,%d,%d",
-					url.QueryEscape(poi.Label),
-					poi.Latitude,
-					poi.Longitude,
-					poi.OffsetX,
-					poi.OffsetY)
-			} else {
-				parts[i] = fmt.Sprintf("%s,%f,%f",
-					url.QueryEscape(poi.Label),
-					poi.Latitude,
-					poi.Longitude)
-			}
+
+	v.Set(key, size)
+	return nil
+}
+
+type StaticMapGeoPoint struct {
+	Latitude  float64
+	Longitude float64
+}
+
+func (s *StaticMapGeoPoint) String() string {
+	return fmt.Sprintf("%f,%f", s.Latitude, s.Longitude)
+}
+
+func (s *StaticMapGeoPoint) EncodeValues(key string, v *url.Values) error {
+	v.Set(key, s.String())
+	return nil
+}
+
+type StaticMapBoundingBox struct {
+	TopLeft     StaticMapGeoPoint
+	BottomRight StaticMapGeoPoint
+}
+
+func (s *StaticMapBoundingBox) EncodeValues(key string, v *url.Values) error {
+	v.Set(key, fmt.Sprintf("%v,%v", s.TopLeft.String(), s.BottomRight.String()))
+	return nil
+}
+
+type StaticMapFormat string
+
+const (
+	StaticMapFormatPNG   StaticMapFormat = "png"
+	StaticMapFormatGIF                   = "gif"
+	StaticMapFormatJPEG                  = "jpeg"
+	StaticMapFormatJPG                   = "jpg"
+	StaticMapFormatJPG70                 = "jpg70"
+	StaticMapFormatJPG80                 = "jpg80"
+	StaticMapFormatJPG90                 = "jpg90"
+)
+
+type StaticMapType string
+
+const (
+	StaticMapTypeDark      StaticMapType = "dark"
+	StaticMapTypeLight                   = "light"
+	StaticMapTypeMap                     = "map"
+	StaticMapTypeHybrid                  = "hyb"
+	StaticMapTypeSatellite               = "sat"
+)
+
+type StaticMapScalebar struct {
+	Enable   bool
+	Position string
+}
+
+func (s *StaticMapScalebar) EncodeValues(key string, v *url.Values) error {
+	if s.Enable {
+		val := "true"
+		if s.Position != "" {
+			val += "|" + s.Position
 		}
-		qs = append(qs, fmt.Sprintf("pois=%s", strings.Join(parts, "|")))
+		v.Set(key, val)
+	} else {
+		v.Set(key, "false")
 	}
 
-	// Key has to be handled specifically here, because
-	// the MapQuest API seems to not like the key URL-encoded
-	qs = append(qs, fmt.Sprintf("key=%s", api.c.key)) // Do not escape, MapQuest won't like it
-	u.RawQuery = strings.Join(qs, "&")
-	return u.String(), nil
+	return nil
+}
+
+type StaticMapLocation struct {
+	Location string
+	Marker   string
+}
+
+func (s *StaticMapLocation) String() string {
+	str := s.Location
+	if s.Marker != "" {
+		str += "|" + s.Marker
+	}
+	return str
+}
+func (s *StaticMapLocation) EncodeValues(key string, v *url.Values) error {
+	v.Set(key, s.String())
+	return nil
+}
+
+type StaticMapLocations []StaticMapLocation
+
+func (s StaticMapLocations) EncodeValues(key string, v *url.Values) error {
+	if len(s) > 0 {
+		locs := make([]string, len(s))
+		for i, l := range s {
+			locs[i] = l.String()
+		}
+
+		v.Set(key, strings.Join(locs, "||"))
+	} else {
+		v.Set(key, "")
+	}
+
+	return nil
+}
+
+type StaticMapBannerSize string
+
+const (
+	StaticMapBannerSizeSmall  StaticMapBannerSize = "sm"
+	StaticMapBannerSizeMedium                     = "md"
+	StaticMapBannerSizeLarge                      = "lg"
+)
+
+type StaticMapBanner struct {
+	Text            string
+	Size            StaticMapBannerSize
+	OnTop           bool
+	TextColor       int // find a way to set 0x000000 without a helper function maybe?
+	BackgroundColor int
+}
+
+func (s *StaticMapBanner) appendOption(line string, option string, hasOption bool) (string, bool) {
+	if hasOption {
+		line = line + "-" + option
+	} else {
+		line = line + "|" + option
+	}
+
+	return line, true
+}
+
+func (s *StaticMapBanner) EncodeValues(key string, v *url.Values) error {
+	val := s.Text
+	hasOptions := false
+	hasTextColor := false
+
+	if s.Size != "" {
+		val, hasOptions = s.appendOption(val, string(s.Size), hasOptions)
+	}
+
+	// bottom is default
+	if s.OnTop {
+		val, hasOptions = s.appendOption(val, "top", hasOptions)
+	}
+
+	if s.TextColor > 0 {
+		val, hasOptions = s.appendOption(val, fmt.Sprintf("%06x", s.TextColor), hasOptions)
+		hasTextColor = true
+	}
+
+	if s.BackgroundColor > 0 {
+		if !hasTextColor {
+			val, hasOptions = s.appendOption(val, "ffffff", hasOptions)
+		}
+
+		val, hasOptions = s.appendOption(val, fmt.Sprintf("%06x", s.TextColor), hasOptions)
+	}
+
+	v.Set(key, val)
+	return nil
+}
+
+type StaticMapColor struct {
+	R int
+	G int
+	B int
+	A int
+}
+
+func (s *StaticMapColor) EncodeValues(key string, v *url.Values) error {
+	if s.A == 0 {
+		v.Set(key, fmt.Sprint("%d,%d,%d", s.R, s.G, s.B))
+	} else {
+		v.Set(key, fmt.Sprint("%d,%d,%d,%d", s.R, s.G, s.B, s.A))
+	}
+
+	return nil
+}
+
+func StaticMapColorHex(h int) *StaticMapColor {
+	c := new(StaticMapColor)
+
+	c.R = (h >> 16) & 0xff
+	c.G = (h >> 8) & 0xff
+	c.B = (h) & 0xff
+
+	return c
+}
+
+func StaticMapColorHexAlpha(h int) *StaticMapColor {
+	c := StaticMapColorHex((h >> 8) & 0xffffff)
+	c.A = h & 0xff
+	return c
+}
+
+type StaticMapShape struct {
 }
 
 type StaticMapRequest struct {
-	// Center defines the center point for the map image.
-	Center *GeoPoint
+	Size        *StaticMapSize        `url:"size,omitempty"`
+	Center      string                `url:"center,omitempty"`
+	BoundingBox *StaticMapBoundingBox `url:"boundingBox,omitempty"`
+	Margin      int                   `url:"margin,omitempty"`
+	Zoom        int                   `url:"zoom,omitempty"`
+	Format      StaticMapFormat       `url:"format,omitempty"`
+	Type        StaticMapType         `url:"type,omitempty"`
+	Scalebar    *StaticMapScalebar    `url:"scalebar,omitempty"`
 
-	// Bestfit defines a bounding box to be used to specify
-	// the area of the map to be shown. This can be used
-	// instead of Center.
-	Bestfit *GeoBox
+	// additional location options
+	Locations     StaticMapLocations `url:"locations,omitempty"`
+	Declutter     bool               `url:"declutter,omitempty"`
+	DefaultMarker string             `url:"defaultMarker,omitempty"`
 
-	// Margin can adjust the zoom level accordingly when
-	// you are out of bounds of the map. Use this in
-	// combination with Bestfit.
-	Margin int
+	// banner
+	Banner *StaticMapBanner `url:"banner,omitempty"`
 
-	// Width of the map. The width must not be greater than 3840.
-	Width int
+	// routes
+	Start *StaticMapLocation `url:"start,omitempty"`
+	End   *StaticMapLocation `url:"end,omitempty"`
+	// TODO: https://developer.mapquest.com/documentation/open/static-map-api/v5/map/#request_parameters-session
+	RotueArc   bool            `url:"routeArc,omitempty"`
+	RouteWidth int             `url:"routeWidth,omitempty"`
+	RouteColor *StaticMapColor `url:"routeColor,omitempty"`
 
-	// Height of the map. The height must not be greater than 3840.
-	Height int
-
-	// Zoom specifies the zoom level, which is in the
-	// range of 1 (world view) to 18 (most details).
-	// See http://open.mapquestapi.com/staticmap/zoomToScale.html
-	// for details and scale.
-	Zoom int
-
-	// Scale specifies the display scale for the map image,
-	// in the range of 1-18 (see Zoom).
-	// You must specify a scale when you use the Center property
-	// and you do not specify a zoom level.
-	Scale int
-
-	// Type specifies the map mode. It can be "map", "sat", or "hyb".
-	// The default is "map".
-	Type string
-
-	// Format specifies the image format. Valid values are
-	// "jpeg", "jpg", "gif", and "png". The default is "jpg".
-	Format string
-
-	// PointsOfInterest enlists the various points of interest to be
-	// displayed on the map.
-	PointsOfInterest []*PointOfInterest
-}
-
-// PointOfInterest defines an interesting point to be displayed on a map.
-type PointOfInterest struct {
-	// Label is the name of the icon to display.
-	// See http://open.mapquestapi.com/staticmap/icons.html for
-	// the list of valid icons.
-	Label string
-
-	// Latitude of the point of interest.
-	Latitude float64
-
-	// Longitude of the point of interest.
-	Longitude float64
-
-	// OffsetX is the offset on the x axis. It is optional.
-	OffsetX int
-
-	// OffsetY is the offset on the y axis. It is optional.
-	OffsetY int
+	// shapemagics
+	// TODO: https://developer.mapquest.com/documentation/open/static-map-api/v5/map/#request_parameters-shape
 }
