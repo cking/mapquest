@@ -35,7 +35,7 @@ func (api *NominatimAPI) Search(req *NominatimSearchRequest) (*NominatimSearchRe
 
 	q.Set("key", api.c.key)
 	q.Set("format", "json")
-	u := apiURL(NominatimPrefix, NominatimVersion, "search.api")
+	u := apiURL(NominatimPrefix, NominatimVersion, "search.php")
 	u.RawQuery = q.Encode()
 
 	httpRequest, err := http.NewRequest("GET", u.String(), nil)
@@ -69,7 +69,7 @@ func (api *NominatimAPI) Reverse(req *NominatimReverseRequest) (*NominatimSearch
 
 	q.Set("key", api.c.key)
 	q.Set("format", "json")
-	u := apiURL(NominatimPrefix, NominatimVersion, "search.api")
+	u := apiURL(NominatimPrefix, NominatimVersion, "reverse.php")
 	u.RawQuery = q.Encode()
 
 	httpRequest, err := http.NewRequest("GET", u.String(), nil)
