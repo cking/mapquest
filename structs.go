@@ -6,8 +6,8 @@ import (
 )
 
 type GeoPoint struct {
-	Latitude  float64
-	Longitude float64
+	Latitude  float64 `json:"lat"`
+	Longitude float64 `json:"lng"`
 }
 
 func (s *GeoPoint) String() string {
